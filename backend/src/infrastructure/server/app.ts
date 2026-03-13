@@ -1,11 +1,22 @@
-import express from "express";
-import { router } from "../../adapters/inbound/http/router";
+import express from 'express';
+import { createApiRouter } from '../../adapters/inbound/http/router';
+import type { Repositories } from '../../adapters/inbound/http/router';
 
-export const app = express();
+export type { Repositories };
 
-app.use(express.json());
-app.use("/api", router);
+/**
+ * Create an Express app wired with the given repository implementations.
+ * Keeps the app decoupled from concrete adapters (manual DI).
+ */
+export function createApp(repos: Repositories) {
+  const app = express();
 
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok" });
-});
+  app.use(express.json());
+  app.use('/api', createApiRouter(repos));
+
+  app.get('/health', (_req, res) => {
+    res.json({ status: 'ok' });
+  });
+
+  return app;
+}

@@ -18,6 +18,8 @@ Boilerplate generation — Express app wiring, pg pool setup, migration runners 
 
 **Algorithm generation** was tested with the `CreatePool` use-case, which required a greedy accumulator-based allocation algorithm with three validation invariants. The agent produced correct allocation logic on the first pass and added defensive post-allocation checks — a pattern that shows the agent can reason about algorithmic correctness beyond simple CRUD. The 8-test suite covered both happy paths and edge cases (empty members, zero-CB ships, partial coverage), all passing without correction.
 
+**HTTP layer wiring** demonstrated the agent's ability to refactor existing infrastructure while maintaining backwards compatibility. When asked to create Express routers, the agent recognized that the existing static `router` and `app` exports needed to become factory functions to support manual dependency injection. It refactored `app.ts` from `export const app` to `export function createApp(repos)` and updated `index.ts` accordingly — all without breaking the existing 24 tests. The factory pattern preserves the hexagonal boundary cleanly: adapters receive port interfaces, never import infrastructure directly.
+
 ## Where Manual Oversight Matters
 
 Domain-specific logic requires careful human review. The FuelEU Maritime compliance formulas (CB calculation, banking rules, pooling constraints) involve regulation-specific semantics that an AI agent may approximate but not guarantee. Every formula and business rule must be validated against the actual regulation text.

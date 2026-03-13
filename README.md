@@ -28,7 +28,7 @@ backend/src/
       inbound/            ← interfaces exposed by use-cases
       outbound/           ← repository interfaces (IRouteRepository, IComplianceRepository, IBankRepository, IPoolRepository)
   adapters/
-    inbound/http/         ← Express route handlers
+    inbound/http/         ← Express routers (routesRouter, complianceRouter, bankingRouter, poolsRouter)
     outbound/postgres/    ← DB repositories implementing outbound ports
   infrastructure/
     db/                   ← migrations, pool config, seed

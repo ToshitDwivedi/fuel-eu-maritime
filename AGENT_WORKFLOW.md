@@ -166,6 +166,36 @@
 - Confirmed post-allocation invariant checks run after allocation (defensive, even though greedy algorithm should guarantee them)
 - Use-case imports only `IPoolRepository` and domain types — zero framework deps
 
+### Prompt 7 — Express Routers & Manual Dependency Injection
+
+**Prompt:**
+> In /backend/src/adapters/inbound/http/, create Express routers for routes, compliance, banking, and pools. Wire DI manually (no IoC container). Each router is a factory function accepting repository interfaces. Return proper status codes: 200/201 success, 400 validation, 404 not found, 500 internal.
+
+**Output:**
+- `routesRouter.ts`: factory `createRoutesRouter(routeRepo)` with 3 endpoints
+  - GET `/routes` with optional vesselType, fuelType, year query filters
+  - POST `/routes/:id/baseline` sets baseline, returns 404 if not found
+  - GET `/routes/comparison` computes percentDiff and compliant inline, returns 404 if no baseline
+- `complianceRouter.ts`: factory `createComplianceRouter(routeRepo, complianceRepo, bankRepo)` with 2 endpoints
+  - GET `/compliance/cb?shipId&year` runs ComputeCB use-case
+  - GET `/compliance/adjusted-cb?shipId&year` returns CB + applied bank entries
+- `bankingRouter.ts`: factory `createBankingRouter(complianceRepo, bankRepo)` with 3 endpoints
+  - GET `/banking/records?shipId&year` returns bank entries
+  - POST `/banking/bank` runs BankSurplus use-case, returns 201
+  - POST `/banking/apply` runs ApplyBanked use-case
+- `poolsRouter.ts`: factory `createPoolsRouter(poolRepo)` with 1 endpoint
+  - POST `/pools` runs CreatePool use-case, returns 201
+- `router.ts` rewritten as `createApiRouter(repos)` factory composing all sub-routers
+- `app.ts` rewritten as `createApp(repos)` factory — decoupled from concrete adapters
+- `index.ts` updated with stub repos (throws "not implemented") as placeholder until Postgres adapters are built
+
+**Validation:**
+- `npx tsc --noEmit` — zero errors
+- `npx jest --verbose` — 24/24 existing tests still pass (no regressions)
+- All router files import only port interfaces and use-cases — no direct DB access
+- Error handling pattern: try/catch with message-based status code routing (400/404/500)
+- Factory pattern preserves hexagonal boundary: adapters receive ports, never import infrastructure
+
 ## Validation / Corrections
 
 | Step | What was checked | Result |
@@ -190,6 +220,10 @@
 | CreatePool invariants | Post-allocation checks for deficit-worse and surplus-negative | Correct |
 | CreatePool tests | 8/8 pass: 4 happy paths + 4 edge cases | Correct |
 | All tests combined | 24/24 pass across 4 suites | Correct |
+| Router factories | All routers accept port interfaces, no direct DB imports | Correct |
+| HTTP status codes | 200/201/400/404/500 mapped correctly per endpoint | Correct |
+| DI wiring | `createApp(repos)` → `createApiRouter` → sub-routers, no globals | Correct |
+| No regressions | 24/24 tests still pass after router + app refactor | Correct |
 
 ## Observations
 
@@ -203,6 +237,7 @@
 - Test file with `jest.Mocked<>` typed mocks, `toBeCloseTo` for floating-point, and `expect.closeTo` in `toHaveBeenCalledWith` — all idiomatic Jest patterns produced correctly first try
 - BankSurplus + ApplyBanked: two use-cases with 13 combined tests generated in a single pass — agent correctly inferred guard-clause ordering (input validation → existence check → business rule) and greedy smallest-first application strategy
 - CreatePool: greedy allocation algorithm with accumulator pattern generated correctly — agent added defensive post-allocation invariant checks even though the algorithm guarantees them, showing good engineering judgment
+- Express routers: 4 router factories + app factory + DI wiring generated in one pass — agent correctly used factory functions (not static exports) to keep hexagonal boundary clean, and refactored app.ts/index.ts to match
 
 ### Where manual intervention was needed
 - Agent outputs were reviewed for correctness against the assignment spec
@@ -215,6 +250,8 @@
 - Verified ApplyBanked smallest-first sort via `toHaveBeenNthCalledWith` call-order assertions in tests
 - Hand-traced CreatePool 4-ship accumulator to verify greedy allocation math
 - Confirmed CreatePool two-step persistence: `createPool` then `addMembers` (matches port interface design)
+- Reviewed router error-handling: message-based status code routing using string includes — pragmatic for now, noted as candidate for error class refactor later
+- Verified app.ts refactor from static `app` export to `createApp(repos)` factory — preserves testability
 
 ### How tools were combined
 - Claude Code handled the full flow: reading the assignment, scaffolding, code generation, git operations
