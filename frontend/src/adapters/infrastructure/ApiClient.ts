@@ -8,6 +8,7 @@ import type {
   PoolResult,
 } from '@core/domain';
 import type { IApiClient, RouteFilters } from '@core/ports/IApiClient';
+import { TARGET_INTENSITY } from '@shared/constants';
 
 /**
  * Fetch-based API client implementing the IApiClient port.
@@ -50,7 +51,20 @@ export class ApiClient implements IApiClient {
   }
 
   async getComparison(): Promise<RouteComparison[]> {
-    return this.request<RouteComparison[]>('/routes/comparison');
+    const data = await this.request<{
+      baseline: Route;
+      comparisons: RouteComparison[];
+    }>('/routes/comparison');
+
+    // Prepend the baseline as a RouteComparison entry so the UI can display it
+    const baselineEntry: RouteComparison = {
+      route: data.baseline,
+      baselineGhgIntensity: data.baseline.ghgIntensity,
+      percentDiff: 0,
+      compliant: data.baseline.ghgIntensity <= TARGET_INTENSITY,
+    };
+
+    return [baselineEntry, ...data.comparisons];
   }
 
   async getCB(shipId: string, year: number): Promise<ComplianceBalance> {

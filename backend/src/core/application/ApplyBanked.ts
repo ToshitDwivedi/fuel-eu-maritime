@@ -58,23 +58,15 @@ export class ApplyBanked {
     for (const entry of sorted) {
       if (remaining <= 0) break;
 
-      if (entry.amountGco2eq <= remaining) {
-        // Fully consume this entry
-        await this.bankRepo.markApplied(entry.id);
-        remaining -= entry.amountGco2eq;
-      } else {
-        // Partially needed — mark the whole entry as applied
-        await this.bankRepo.markApplied(entry.id);
-        remaining = 0;
-      }
+      await this.bankRepo.markApplied(entry.id);
+      remaining -= entry.amountGco2eq;
     }
 
-    const applied = amount - remaining;
-    const usedFromBank = available.reduce((sum, e) => sum + e.amountGco2eq, 0);
+    const applied = amount;
 
     return {
       applied,
-      remaining: usedFromBank - applied,
+      remaining: totalAvailable - applied,
       cbAfter: cb.cbGco2eq + applied,
     };
   }
