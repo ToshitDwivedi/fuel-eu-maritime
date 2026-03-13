@@ -268,6 +268,12 @@
 | Shared constants | TARGET_INTENSITY=89.3368, MJ_PER_TONNE=41000 | Correct |
 | Frontend type-check | `tsc --noEmit` passes with strict mode, zero errors | Correct |
 | Frontend build | `vite build` succeeds, 190KB JS + 8KB CSS | Correct |
+| App.tsx tab nav | 4 tabs with active state, conditional rendering, Tailwind styling | Correct |
+| RoutesTab filters | 3 dynamic selects (vesselType, fuelType, year) from fetched data | Correct |
+| RoutesTab table | 9 columns matching spec, responsive overflow-x-auto wrapper | Correct |
+| RoutesTab baseline | Blue background + badge for baseline row, Set Baseline button per row | Correct |
+| RoutesTab states | Loading spinner, error alert, empty state all handled | Correct |
+| RoutesTab build | `tsc --noEmit` zero errors, `vite build` 197KB JS + 14KB CSS | Correct |
 
 ## Observations
 
@@ -283,6 +289,7 @@
 - CreatePool: greedy allocation algorithm with accumulator pattern generated correctly — agent added defensive post-allocation invariant checks even though the algorithm guarantees them, showing good engineering judgment
 - Express routers: 4 router factories + app factory + DI wiring generated in one pass — agent correctly used factory functions (not static exports) to keep hexagonal boundary clean, and refactored app.ts/index.ts to match
 - Integration tests: 25 supertest tests + 4 in-memory repo classes + seed data generated in one pass — agent correctly designed repos to implement exact port interfaces, and the test scenarios covered all status codes (200/201/400/404) with realistic multi-step workflows (compute CB → bank → apply → verify adjusted-cb)
+- Tab navigation + RoutesTab: agent produced App.tsx with tab switching and a full data-fetching RoutesTab component in a single pass — dynamic filter options derived via `useMemo` + `Set`, proper `useCallback`/`useEffect` for data fetching, loading/error/empty UI states, and baseline highlight with badge — all type-checking on first try
 
 ### Where manual intervention was needed
 - Agent outputs were reviewed for correctness against the assignment spec
@@ -347,3 +354,37 @@
 - `validatePool` enforces min 2 members and sum(cbBefore) >= 0 rules
 - Zero framework imports in `core/` — only `@core/domain` and `@shared/constants`
 - `ApiClient` constructor defaults to `import.meta.env.VITE_API_URL` falling back to `http://localhost:3000/api`
+
+### Prompt 10 — Tab Navigation & Routes Tab (React + Tailwind)
+
+**Prompt:**
+> In /frontend/src, create:
+> 1. App.tsx — tab navigation with 4 tabs: Routes | Compare | Banking | Pooling. Use state for activeTab. Tailwind styling: tab bar at top, content below. Each tab renders its own component.
+> 2. adapters/ui/RoutesTab.tsx: On mount fetch routes via ApiClient. Filter controls: vesselType, fuelType, year — all dynamically populated. Display table with columns: routeId, vesselType, fuelType, year, ghgIntensity, fuelConsumption, distance, totalEmissions. Each row has "Set Baseline" button. Highlight current baseline row with colored badge. Show loading and error states. Responsive horizontal scroll on mobile.
+
+**Output:**
+- `App.tsx`: 4-tab navigation using `useState<'routes' | 'compare' | 'banking' | 'pooling'>` with conditional rendering
+  - Tab bar styled with Tailwind: `flex border-b`, active tab gets `border-blue-600 text-blue-600` bottom border
+  - Header with "FuelEU Maritime — Compliance Dashboard" title
+  - Compare/Banking/Pooling render placeholder `<div>` for now
+- `RoutesTab.tsx`: full data-fetching component in `adapters/ui/`
+  - `useCallback` for `fetchRoutes` with filter dependencies, called in `useEffect`
+  - 3 filter `<select>` dropdowns: vesselType, fuelType, year — options derived from fetched data via `useMemo` + `new Set`
+  - Responsive table: `overflow-x-auto` wrapper, `min-w-full` table, 9 columns including Actions
+  - Baseline row: `bg-blue-50` background + inline `<span>` badge ("Baseline" in blue pill)
+  - "Set Baseline" button per non-baseline row: calls `api.setBaseline(route.id)` then refetches
+  - Loading state: spinning border animation + "Loading routes..." text
+  - Error state: red `bg-red-50` alert banner with error message
+  - Empty state: centered "No routes found." text
+  - `settingBaseline` state disables all buttons while any baseline request is in-flight
+
+**Validation:**
+- `npx tsc -p tsconfig.app.json --noEmit` — zero errors under strict mode
+- `npx vite build` — successful production build (197 KB JS, 14 KB CSS)
+- App.tsx renders correct component per tab — verified conditional rendering logic
+- RoutesTab filter selects use correct union types (`VesselType | ''`, `FuelType | ''`)
+- `handleSetBaseline` properly awaits both `setBaseline` and `fetchRoutes` before clearing loading state
+- Table columns match spec exactly: routeId, vesselType, fuelType, year, ghgIntensity, fuelConsumption, distance, totalEmissions
+- `toFixed(2)` used for ghgIntensity, `toLocaleString()` for numeric columns — proper formatting
+- `encodeURIComponent` already handled in `ApiClient.setBaseline` — no double-encoding
+- Zero external component libraries — all styling via TailwindCSS utility classes
