@@ -133,6 +133,39 @@
 - Verified guard-clause ordering: amount validation → CB lookup → business-rule check
 - Confirmed `markApplied` call order in ApplyBanked tests matches smallest-first sort
 
+### Prompt 6 — CreatePool Use-Case & Unit Tests
+
+**Prompt:**
+> In /backend/src/core/application/CreatePool.ts: Input: { year, members: Array<{ shipId, cbBefore }> }.
+> Validation: sum cbBefore >= 0, no deficit ship exits worse, no surplus ship exits negative.
+> Greedy allocation: sort desc by cbBefore, surplus ships donate to accumulator (exit at 0), deficit ships pull from accumulator.
+> Save to IPoolRepository. Return { poolId, year, members with cbAfter }.
+> Tests: valid pool with surplus + deficit, sum < 0 throws, surplus ship going negative throws.
+
+**Output:**
+- `CreatePool.ts`: use-case with constructor-injected `IPoolRepository`
+  - Validates members.length > 0, then ∑ cbBefore ≥ 0
+  - Sorts descending by cbBefore (surplus ships processed first)
+  - Greedy allocation via accumulator: surplus ships donate to pool (exit at 0), deficit ships pull from accumulator
+  - Post-allocation invariant checks: deficit can't exit worse, surplus can't exit negative
+  - Persists via `createPool(year)` → `addMembers(poolId, allocated)` two-step
+- `__tests__/CreatePool.test.ts`: 8 tests
+  - 1 surplus + 1 deficit: full coverage, both exit at 0
+  - Partial coverage: surplus insufficient but ∑ ≥ 0
+  - Multiple surplus + deficit: 4 ships, accumulator traced step-by-step
+  - Surplus runs out across multiple deficits
+  - Sum < 0 → throws with exact negative value in message
+  - Empty members → throws
+  - All-surplus pool: no deficits, everyone exits at 0
+  - Zero-CB member: stays at 0 throughout
+
+**Validation:**
+- `npx tsc --noEmit` — zero errors
+- `npx jest --verbose` — 24/24 tests passing across 4 suites
+- Hand-traced accumulator for 4-ship test: 0 → +400K → +500K → +200K → +50K ✓
+- Confirmed post-allocation invariant checks run after allocation (defensive, even though greedy algorithm should guarantee them)
+- Use-case imports only `IPoolRepository` and domain types — zero framework deps
+
 ## Validation / Corrections
 
 | Step | What was checked | Result |
@@ -153,6 +186,10 @@
 | BankSurplus tests | 6/6 pass: happy path + 5 edge cases | Correct |
 | ApplyBanked tests | 7/7 pass: happy path + partial + 5 edge cases | Correct |
 | All tests combined | 16/16 pass across 3 suites | Correct |
+| CreatePool allocation | Hand-traced 4-ship accumulator: 0→400K→500K→200K→50K | Correct |
+| CreatePool invariants | Post-allocation checks for deficit-worse and surplus-negative | Correct |
+| CreatePool tests | 8/8 pass: 4 happy paths + 4 edge cases | Correct |
+| All tests combined | 24/24 pass across 4 suites | Correct |
 
 ## Observations
 
@@ -165,6 +202,7 @@
 - Use-case class with constructor injection, formula implementation, and return type generated in one pass — agent correctly mapped `route.routeId` to `shipId` without being told
 - Test file with `jest.Mocked<>` typed mocks, `toBeCloseTo` for floating-point, and `expect.closeTo` in `toHaveBeenCalledWith` — all idiomatic Jest patterns produced correctly first try
 - BankSurplus + ApplyBanked: two use-cases with 13 combined tests generated in a single pass — agent correctly inferred guard-clause ordering (input validation → existence check → business rule) and greedy smallest-first application strategy
+- CreatePool: greedy allocation algorithm with accumulator pattern generated correctly — agent added defensive post-allocation invariant checks even though the algorithm guarantees them, showing good engineering judgment
 
 ### Where manual intervention was needed
 - Agent outputs were reviewed for correctness against the assignment spec
@@ -175,6 +213,8 @@
 - Hand-calculated both test expectations to confirm math correctness
 - Reviewed BankSurplus error messages for clarity — each message includes actual vs requested values for debugging
 - Verified ApplyBanked smallest-first sort via `toHaveBeenNthCalledWith` call-order assertions in tests
+- Hand-traced CreatePool 4-ship accumulator to verify greedy allocation math
+- Confirmed CreatePool two-step persistence: `createPool` then `addMembers` (matches port interface design)
 
 ### How tools were combined
 - Claude Code handled the full flow: reading the assignment, scaffolding, code generation, git operations

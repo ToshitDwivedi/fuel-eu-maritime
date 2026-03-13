@@ -23,7 +23,7 @@ Both frontend and backend follow a hexagonal architecture with strict dependency
 backend/src/
   core/
     domain/               ← pure-data TS interfaces (Route, ComplianceBalance, BankEntry, Pool, PoolMember)
-    application/          ← use-cases (ComputeCB, BankSurplus, ApplyBanked)
+    application/          ← use-cases (ComputeCB, BankSurplus, ApplyBanked, CreatePool)
     ports/
       inbound/            ← interfaces exposed by use-cases
       outbound/           ← repository interfaces (IRouteRepository, IComplianceRepository, IBankRepository, IPoolRepository)

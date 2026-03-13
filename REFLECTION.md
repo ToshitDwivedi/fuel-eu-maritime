@@ -16,6 +16,8 @@ Boilerplate generation — Express app wiring, pg pool setup, migration runners 
 
 **Multi-use-case generation** scaled well. When asked to produce `BankSurplus` and `ApplyBanked` simultaneously (with 13 combined test cases), the agent maintained consistency across both — identical mock-factory patterns, consistent guard-clause ordering (input validation → existence check → business rule), and correct inter-use-case semantics (BankSurplus saves `applied: false`, ApplyBanked calls `markApplied`). The greedy smallest-first strategy in `ApplyBanked` was accurately implemented and verified with `toHaveBeenNthCalledWith` call-order assertions.
 
+**Algorithm generation** was tested with the `CreatePool` use-case, which required a greedy accumulator-based allocation algorithm with three validation invariants. The agent produced correct allocation logic on the first pass and added defensive post-allocation checks — a pattern that shows the agent can reason about algorithmic correctness beyond simple CRUD. The 8-test suite covered both happy paths and edge cases (empty members, zero-CB ships, partial coverage), all passing without correction.
+
 ## Where Manual Oversight Matters
 
 Domain-specific logic requires careful human review. The FuelEU Maritime compliance formulas (CB calculation, banking rules, pooling constraints) involve regulation-specific semantics that an AI agent may approximate but not guarantee. Every formula and business rule must be validated against the actual regulation text.
