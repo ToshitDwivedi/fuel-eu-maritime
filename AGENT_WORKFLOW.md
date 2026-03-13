@@ -274,6 +274,14 @@
 | RoutesTab baseline | Blue background + badge for baseline row, Set Baseline button per row | Correct |
 | RoutesTab states | Loading spinner, error alert, empty state all handled | Correct |
 | RoutesTab build | `tsc --noEmit` zero errors, `vite build` 197KB JS + 14KB CSS | Correct |
+| CompareTab deps | chart.js, react-chartjs-2, chartjs-plugin-annotation installed | Correct |
+| CompareTab tree-shaking | Only 6 Chart.js modules registered (no unused elements) | Correct |
+| CompareTab summary card | Baseline route info + target intensity, graceful "—" fallback | Correct |
+| CompareTab table | 5 columns, color-coded rows (blue/green/red), +/- formatted % diff | Correct |
+| CompareTab chart | Bar chart with per-bar colors, dashed target line at 89.3368 | Correct |
+| CompareTab integration | Wired into App.tsx, replaces placeholder, correct tab rendering | Correct |
+| CompareTab type-check | `tsc --noEmit` zero errors, `vite build` 405KB JS + 16KB CSS | Correct |
+| CompareTab lint | `eslint` zero warnings on CompareTab.tsx and App.tsx | Correct |
 
 ## Observations
 
@@ -290,6 +298,7 @@
 - Express routers: 4 router factories + app factory + DI wiring generated in one pass — agent correctly used factory functions (not static exports) to keep hexagonal boundary clean, and refactored app.ts/index.ts to match
 - Integration tests: 25 supertest tests + 4 in-memory repo classes + seed data generated in one pass — agent correctly designed repos to implement exact port interfaces, and the test scenarios covered all status codes (200/201/400/404) with realistic multi-step workflows (compute CB → bank → apply → verify adjusted-cb)
 - Tab navigation + RoutesTab: agent produced App.tsx with tab switching and a full data-fetching RoutesTab component in a single pass — dynamic filter options derived via `useMemo` + `Set`, proper `useCallback`/`useEffect` for data fetching, loading/error/empty UI states, and baseline highlight with badge — all type-checking on first try
+- CompareTab + Chart.js: agent produced a complete comparison tab with summary card, color-coded table, and interactive bar chart in a single pass — correctly identified need for `chartjs-plugin-annotation` (not bundled with chart.js) for the horizontal target reference line, used tree-shaken imports to minimize bundle size (~200KB added for Chart.js vs full ~300KB), and followed exact same component patterns as RoutesTab for consistency
 
 ### Where manual intervention was needed
 - Agent outputs were reviewed for correctness against the assignment spec
@@ -306,6 +315,9 @@
 - Verified app.ts refactor from static `app` export to `createApp(repos)` factory — preserves testability
 - Integration tests exposed 3 bugs: bankingRouter 404 catch didn't match "No compliance balance" message, adjusted-cb test expected partial apply (30M) but ApplyBanked marks full entries (50M), and helpers.ts was matched by old testMatch glob — all fixed in same pass
 - In-memory repos confirmed as correct test doubles: all 4 implement exact port interfaces, no extra methods or shortcuts
+- CompareTab: verified `chartjs-plugin-annotation` correctly drawn at y=89.3368, not at pixel coordinates — important since chart scale is dynamic
+- Verified `formatDiff` edge case: baseline row shows "—" instead of `+0.00%` (self-comparison would be meaningless)
+- Confirmed row color-coding precedence: baseline check is evaluated first, so the baseline route always gets blue background regardless of its compliance status
 
 ### How tools were combined
 - Claude Code handled the full flow: reading the assignment, scaffolding, code generation, git operations
@@ -388,3 +400,48 @@
 - `toFixed(2)` used for ghgIntensity, `toLocaleString()` for numeric columns — proper formatting
 - `encodeURIComponent` already handled in `ApiClient.setBaseline` — no double-encoding
 - Zero external component libraries — all styling via TailwindCSS utility classes
+
+### Prompt 11 — Compare Tab with Comparison Table and Chart.js Bar Chart
+
+**Prompt:**
+> Create /frontend/src/adapters/ui/CompareTab.tsx:
+> - Fetch comparison data from API on mount
+> - Show a summary card: baseline route info + target intensity (89.3368 gCO2e/MJ)
+> - Table columns: Route ID, Vessel Type, GHG Intensity, % Difference (formatted to 2 decimals with +/- sign), Compliant (✅ ❌)
+> - Color-code compliant rows green, non-compliant rows red (Tailwind bg-green-50 / bg-red-50)
+> - Below the table, render a bar chart using Chart.js (react-chartjs-2): X axis: routeIds, Y axis: ghgIntensity, horizontal reference line at 89.3368 (target), compliant bars: green, non-compliant: red, baseline: blue
+> - Import Chart.js only what's needed (tree-shaking)
+
+**Output:**
+- Installed `chart.js`, `react-chartjs-2`, and `chartjs-plugin-annotation` (for the horizontal target reference line)
+  - Used `--legacy-peer-deps` due to pre-existing `@tailwindcss/vite` ↔ Vite 8 peer conflict
+- `CompareTab.tsx`: full data-fetching component in `adapters/ui/`
+  - Tree-shaken Chart.js registration: only `CategoryScale`, `LinearScale`, `BarElement`, `Tooltip`, `Legend`, and `annotationPlugin`
+  - `useCallback` for `fetchComparisons` calling `api.getComparison()`, invoked in `useEffect`
+  - `useMemo` to derive baseline entry from comparison data
+  - Summary card: baseline route ID, baseline GHG intensity, target intensity (89.3368 gCO₂e/MJ)
+  - Comparison table with 5 columns: Route ID (with Baseline badge), Vessel Type, GHG Intensity, % Difference, Compliant
+  - Row color-coding: `bg-blue-50` (baseline), `bg-green-50` (compliant), `bg-red-50` (non-compliant)
+  - `formatDiff()` helper: formats percent difference with `+/-` sign and 2 decimal places
+  - Percent diff text colored: `text-red-600` (positive = worse) / `text-green-600` (negative = better)
+  - Baseline row shows "—" for % difference (self-comparison is meaningless)
+  - Bar chart via `react-chartjs-2` `<Bar>` component:
+    - X axis: route IDs, Y axis: GHG intensity (gCO₂e/MJ)
+    - Dynamic bar colors: blue (baseline), green (compliant), red (non-compliant) via per-bar `backgroundColor`/`borderColor` arrays
+    - Horizontal dashed reference line at 89.3368 via `chartjs-plugin-annotation` (`type: 'line'`, orange dashed)
+    - Annotation label positioned at end of line showing target value
+  - Custom legend below chart with color swatches for Baseline / Compliant / Non-compliant / Target line
+  - Loading spinner, error banner, and empty state ("Set a baseline route first") all handled
+- Updated `App.tsx`: imported `CompareTab`, replaced placeholder `<p>` with `<CompareTab />` for Compare tab
+
+**Validation:**
+- `npx tsc --noEmit` — zero errors under strict mode
+- `npx vite build` — successful production build (405 KB JS + 16 KB CSS — Chart.js adds ~200 KB)
+- `npx eslint src/adapters/ui/CompareTab.tsx src/App.tsx` — zero lint warnings or errors
+- Summary card correctly shows "—" when no baseline is set (graceful fallback)
+- `formatDiff` verified: positive values get `+` prefix, negative values get `-` naturally from `toFixed`
+- Row color-coding logic: baseline check first (blue), then compliant (green) vs non-compliant (red) — correct precedence
+- Chart.js tree-shaking: only 6 modules registered (CategoryScale, LinearScale, BarElement, Tooltip, Legend, annotationPlugin) — no PointElement, LineElement, ArcElement, or other unused components
+- Annotation plugin correctly draws horizontal line at y=89.3368 with dashed border and end-positioned label
+- `TARGET_INTENSITY` imported from `@shared/constants` (single source of truth, not hardcoded)
+- Component follows exact same patterns as RoutesTab: module-level `api` instance, useState for data/loading/error, useCallback+useEffect for fetching

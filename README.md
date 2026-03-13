@@ -6,7 +6,7 @@ A full-stack implementation of the **Fuel EU Maritime compliance module** (Regul
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React, TypeScript, TailwindCSS |
+| Frontend | React, TypeScript, TailwindCSS, Chart.js |
 | Backend | Node.js, Express, TypeScript |
 | Database | PostgreSQL (node-postgres) |
 | Testing | Jest, ts-jest, Supertest |
@@ -54,7 +54,7 @@ frontend/src/
 | Tab | Description |
 |-----|-------------|
 | **Routes** | View all routes, set baseline, filter by vessel/fuel/year |
-| **Compare** | Baseline vs comparison GHG intensity with compliance flags |
+| **Compare** | Baseline vs comparison GHG intensity table with color-coded compliance, bar chart with target reference line |
 | **Banking** | Bank positive CB, apply banked surplus (Article 20) |
 | **Pooling** | Create pools, greedy allocation with validation (Article 21) |
 
