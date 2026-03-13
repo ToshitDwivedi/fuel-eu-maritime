@@ -258,6 +258,16 @@
 | adjusted-cb fix | Test expectation updated from 30M to 50M (entry-level apply) | Fixed |
 | jest.config fix | testMatch changed to `**/*.test.ts` to exclude helpers.ts | Fixed |
 | All tests combined | 49/49 pass across 5 suites (24 unit + 25 integration) | Correct |
+| Frontend Vite scaffold | Project created with react-ts template, all deps installed | Correct |
+| TailwindCSS setup | v4 with @tailwindcss/vite plugin, @import in index.css | Correct |
+| Frontend path aliases | @core/*, @adapters/*, @shared/* in vite.config + tsconfig | Correct |
+| Frontend domain types | Mirror backend types exactly, all readonly, barrel exports | Correct |
+| IApiClient interface | 8 methods matching backend endpoints, RouteFilters type | Correct |
+| ApiClient implementation | fetch-based, error handling, 204 support, URL encoding | Correct |
+| Application functions | computePercentDiff, isCompliant, validatePool — pure, no deps | Correct |
+| Shared constants | TARGET_INTENSITY=89.3368, MJ_PER_TONNE=41000 | Correct |
+| Frontend type-check | `tsc --noEmit` passes with strict mode, zero errors | Correct |
+| Frontend build | `vite build` succeeds, 190KB JS + 8KB CSS | Correct |
 
 ## Observations
 
@@ -293,6 +303,7 @@
 ### How tools were combined
 - Claude Code handled the full flow: reading the assignment, scaffolding, code generation, git operations
 - Parallel file creation was used to speed up multi-file scaffolding
+- Frontend scaffolding: agent explored backend domain types first, then generated mirrored frontend types in parallel — ensured structural consistency across the stack
 
 ## Best Practices Followed
 
@@ -300,3 +311,39 @@
 - Reviewed all generated configs against official documentation
 - Kept generated code minimal — placeholder files with guidance comments rather than speculative implementations
 - Incremental commits to show progressive development history
+
+---
+
+### Prompt 9 — Frontend Scaffolding (React + Vite + TailwindCSS + Hexagonal Architecture)
+
+**Prompt:**
+> In /frontend, create a React + TypeScript + TailwindCSS project (Vite). Create hexagonal folder structure mirroring backend: core/domain, core/application, core/ports, adapters/ui, adapters/infrastructure, shared.
+> Define domain types mirroring backend (Route, ComplianceBalance, BankEntry, Pool, PoolMember).
+> In core/ports/IApiClient.ts, define the interface: getRoutes, setBaseline, getComparison, getCB, getAdjustedCB, bankSurplus, applyBanked, createPool.
+> In adapters/infrastructure/ApiClient.ts, implement this interface using fetch(). Set base URL from import.meta.env.VITE_API_URL.
+> In core/application/, create pure functions: computePercentDiff, isCompliant, validatePool.
+> In shared/, add constants TARGET_INTENSITY=89.3368, MJ_PER_TONNE=41000.
+
+**Output:**
+- Scaffolded Vite React+TS project with `npm create vite@latest frontend -- --template react-ts`
+- Installed TailwindCSS v4 with `@tailwindcss/vite` plugin, configured via `@import "tailwindcss"` in index.css
+- Path aliases (`@core/*`, `@adapters/*`, `@shared/*`) configured in both `vite.config.ts` (resolve.alias) and `tsconfig.app.json` (paths)
+- Domain types: 4 files mirroring backend exactly — `route.ts` (Route, RouteComparison, VesselType, FuelType), `compliance.ts` (ComplianceBalance), `bank-entry.ts` (BankEntry, BankResult), `pool.ts` (Pool, PoolMember, PoolMemberInput, PoolResult), `index.ts` (barrel)
+- Port interface: `IApiClient.ts` with 8 methods covering all API endpoints, plus `RouteFilters` type for query parameters
+- Application layer: 3 pure functions — `computePercentDiff(comparison, baseline)`, `isCompliant(ghgIntensity)`, `validatePool(members)` with Article 21 rules
+- Infrastructure adapter: `ApiClient.ts` implementing `IApiClient` with generic `request<T>()` helper, proper error handling (JSON error body extraction), 204 no-content support, URL-encoded query parameters
+- Shared constants: `TARGET_INTENSITY = 89.3368`, `MJ_PER_TONNE = 41_000`
+- Cleaned up Vite boilerplate: removed App.css, replaced default App.tsx with minimal Tailwind placeholder
+- `.env.example` with `VITE_API_URL=http://localhost:3000/api`
+
+**Validation:**
+- `npx tsc -p tsconfig.app.json --noEmit` — zero errors under strict mode
+- `npx vite build` — successful production build (190 KB JS, 8 KB CSS)
+- All domain types verified as structural matches to backend `core/domain` types
+- `IApiClient` interface methods verified against backend router endpoints
+- `ApiClient.ts` properly uses `encodeURIComponent` for path params and `URLSearchParams` for query strings
+- `computePercentDiff` formula verified: `((comparison / baseline) - 1) * 100` matches spec
+- `isCompliant` uses `<=` comparison against `TARGET_INTENSITY` constant
+- `validatePool` enforces min 2 members and sum(cbBefore) >= 0 rules
+- Zero framework imports in `core/` — only `@core/domain` and `@shared/constants`
+- `ApiClient` constructor defaults to `import.meta.env.VITE_API_URL` falling back to `http://localhost:3000/api`

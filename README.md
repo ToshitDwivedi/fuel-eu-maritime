@@ -35,18 +35,18 @@ backend/src/
     server/               ← Express app setup
 ```
 
-### Frontend structure (planned)
+### Frontend structure
 
 ```
 frontend/src/
   core/
-    domain/           ← entities, types
-    application/      ← use-cases
-    ports/            ← interfaces
+    domain/           ← Route, ComplianceBalance, BankEntry, Pool (mirrored from backend)
+    application/      ← pure functions: computePercentDiff, isCompliant, validatePool
+    ports/            ← IApiClient interface (outbound port for API communication)
   adapters/
     ui/               ← React components and hooks
-    infrastructure/   ← API clients
-  shared/
+    infrastructure/   ← fetch-based ApiClient implementing IApiClient
+  shared/             ← constants (TARGET_INTENSITY, MJ_PER_TONNE)
 ```
 
 ## Features
@@ -102,8 +102,9 @@ npm run dev                  # start dev server
 
 ```bash
 cd frontend
+cp .env.example .env        # set VITE_API_URL (defaults to http://localhost:3000/api)
 npm install
-npm run dev
+npm run dev                  # starts Vite dev server on port 5173
 ```
 
 ### Running Tests

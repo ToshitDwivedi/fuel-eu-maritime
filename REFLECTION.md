@@ -38,3 +38,5 @@ Architecture decisions — how to slice domain boundaries, which entities belong
 ## Conclusion
 
 AI agents are most effective as a **force multiplier for experienced developers** — they eliminate tedious boilerplate and accelerate pattern-based code, but the developer remains responsible for correctness, architecture, and domain integrity.
+
+**Frontend scaffolding** further validated this pattern. By first exploring the backend domain types and port interfaces, the agent was able to generate structurally identical frontend types, a clean port interface (`IApiClient` with 8 methods), and a fetch-based adapter — all type-checking under strict mode on the first pass. The hexagonal architecture mirroring was especially effective: having a well-defined backend architecture made the frontend architecture self-evident, and the agent leveraged this systematically by reading all backend files before producing any frontend code. The TailwindCSS v4 setup required handling a Vite 8 peer-dependency conflict (resolved via `--legacy-peer-deps`), demonstrating that real-world toolchain issues still require human-agent collaboration.
