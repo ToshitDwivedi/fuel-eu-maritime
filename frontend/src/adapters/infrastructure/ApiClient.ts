@@ -2,6 +2,7 @@ import type {
   Route,
   RouteComparison,
   ComplianceBalance,
+  BankEntry,
   BankResult,
   PoolMemberInput,
   PoolResult,
@@ -67,6 +68,11 @@ export class ApiClient implements IApiClient {
       method: 'POST',
       body: JSON.stringify({ shipId, year, amount }),
     });
+  }
+
+  async getBankRecords(shipId: string, year: number): Promise<BankEntry[]> {
+    const params = new URLSearchParams({ shipId, year: String(year) });
+    return this.request<BankEntry[]>(`/banking/records?${params}`);
   }
 
   async applyBanked(shipId: string, year: number, amount: number): Promise<BankResult> {

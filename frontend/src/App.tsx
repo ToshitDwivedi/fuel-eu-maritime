@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { RoutesTab } from '@adapters/ui/RoutesTab';
 import { CompareTab } from '@adapters/ui/CompareTab';
+import { BankingTab } from '@adapters/ui/BankingTab';
 
 const TABS = ['Routes', 'Compare', 'Banking', 'Pooling'] as const;
 type Tab = (typeof TABS)[number];
@@ -37,9 +38,7 @@ export default function App() {
       <main className="p-6">
         {activeTab === 'Routes' && <RoutesTab />}
         {activeTab === 'Compare' && <CompareTab />}
-        {activeTab === 'Banking' && (
-          <p className="text-gray-500">Banking tab coming soon.</p>
-        )}
+        {activeTab === 'Banking' && <BankingTab />}
         {activeTab === 'Pooling' && (
           <p className="text-gray-500">Pooling tab coming soon.</p>
         )}

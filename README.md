@@ -55,7 +55,7 @@ frontend/src/
 |-----|-------------|
 | **Routes** | View all routes, set baseline, filter by vessel/fuel/year |
 | **Compare** | Baseline vs comparison GHG intensity table with color-coded compliance, bar chart with target reference line |
-| **Banking** | Bank positive CB, apply banked surplus (Article 20) |
+| **Banking** | Bank positive CB, apply banked surplus with KPI cards and records table (Article 20) |
 | **Pooling** | Create pools, greedy allocation with validation (Article 21) |
 
 ## Core Formulas

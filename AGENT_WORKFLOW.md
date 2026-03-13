@@ -282,6 +282,16 @@
 | CompareTab integration | Wired into App.tsx, replaces placeholder, correct tab rendering | Correct |
 | CompareTab type-check | `tsc --noEmit` zero errors, `vite build` 405KB JS + 16KB CSS | Correct |
 | CompareTab lint | `eslint` zero warnings on CompareTab.tsx and App.tsx | Correct |
+| BankingTab port update | `getBankRecords` added to IApiClient port and ApiClient adapter | Correct |
+| BankingTab inputs | shipId text + year number + Load Data button, proper validation | Correct |
+| BankingTab CB display | Large number with surplus/deficit label, green/red coloring | Correct |
+| BankingTab KPI cards | 3 cards (cbBefore, applied, cbAfter) visible only after apply action | Correct |
+| BankingTab bank action | Disabled when CB <= 0, calls POST /banking/bank, refreshes records | Correct |
+| BankingTab apply action | Disabled when no unapplied records, updates KPIs with BankResult | Correct |
+| BankingTab records table | 3 columns (ID, Amount, Applied), applied rows dimmed | Correct |
+| BankingTab errors | Inline red text, not alerts; cleared before each action | Correct |
+| BankingTab type-check | `tsc --noEmit` zero errors, `vite build` 413KB JS + 17KB CSS | Correct |
+| BankingTab lint | `eslint` zero warnings on all 4 changed files | Correct |
 
 ## Observations
 
@@ -299,6 +309,7 @@
 - Integration tests: 25 supertest tests + 4 in-memory repo classes + seed data generated in one pass — agent correctly designed repos to implement exact port interfaces, and the test scenarios covered all status codes (200/201/400/404) with realistic multi-step workflows (compute CB → bank → apply → verify adjusted-cb)
 - Tab navigation + RoutesTab: agent produced App.tsx with tab switching and a full data-fetching RoutesTab component in a single pass — dynamic filter options derived via `useMemo` + `Set`, proper `useCallback`/`useEffect` for data fetching, loading/error/empty UI states, and baseline highlight with badge — all type-checking on first try
 - CompareTab + Chart.js: agent produced a complete comparison tab with summary card, color-coded table, and interactive bar chart in a single pass — correctly identified need for `chartjs-plugin-annotation` (not bundled with chart.js) for the horizontal target reference line, used tree-shaken imports to minimize bundle size (~200KB added for Chart.js vs full ~300KB), and followed exact same component patterns as RoutesTab for consistency
+- BankingTab: agent identified a missing `getBankRecords` method in the frontend port/adapter before writing the component — proactively added it to maintain hexagonal contract completeness, then produced a multi-action component with 6 state variables, parallel data loading (`Promise.all`), conditional KPI cards, and two disabled-state-aware action buttons — all type-checking on first pass
 
 ### Where manual intervention was needed
 - Agent outputs were reviewed for correctness against the assignment spec
@@ -318,6 +329,10 @@
 - CompareTab: verified `chartjs-plugin-annotation` correctly drawn at y=89.3368, not at pixel coordinates — important since chart scale is dynamic
 - Verified `formatDiff` edge case: baseline row shows "—" instead of `+0.00%` (self-comparison would be meaningless)
 - Confirmed row color-coding precedence: baseline check is evaluated first, so the baseline route always gets blue background regardless of its compliance status
+- BankingTab: verified "Bank Surplus" disables at `currentCB <= 0` (not `< 0`) — zero CB means no surplus to bank
+- Verified `Promise.all` for initial load doesn't mask individual errors — if either CB or records fails, the catch handler still shows the first error message
+- Confirmed KPI cards only appear after apply action (not on initial load), preventing confusing empty state
+- Reviewed `actionLoading` guard: all action buttons disabled while any action is in-flight, preventing concurrent mutations
 
 ### How tools were combined
 - Claude Code handled the full flow: reading the assignment, scaffolding, code generation, git operations
@@ -445,3 +460,44 @@
 - Annotation plugin correctly draws horizontal line at y=89.3368 with dashed border and end-positioned label
 - `TARGET_INTENSITY` imported from `@shared/constants` (single source of truth, not hardcoded)
 - Component follows exact same patterns as RoutesTab: module-level `api` instance, useState for data/loading/error, useCallback+useEffect for fetching
+
+### Prompt 12 — Banking Tab (Article 20) with KPI Cards and Bank Records Table
+
+**Prompt:**
+> Create /frontend/src/adapters/ui/BankingTab.tsx:
+> State needed: shipId (text input), year (number input), currentCB, bankRecords, error
+> Layout: 1. Input section: shipId + year fields, "Load Data" button 2. KPI cards (3 side by side): cb_before, applied, cb_after — show after an apply action 3. "Bank Surplus" button with amount input, calls POST /banking/bank, disabled if currentCB <= 0 4. "Apply Banked Surplus" button with amount input, calls POST /banking/apply, updates KPI cards 5. Table of bank records (id, amount, applied status). All API errors display inline (red text), not as alerts.
+
+**Output:**
+- Identified missing `getBankRecords` method in frontend port interface and adapter — backend has `GET /banking/records?shipId&year` but frontend didn't expose it
+  - Added `getBankRecords(shipId, year): Promise<BankEntry[]>` to `IApiClient` port
+  - Added `BankEntry` import and fetch implementation to `ApiClient` adapter
+- `BankingTab.tsx`: stateful component with 6 state variables
+  - Input section: `shipId` text input + `year` number input + "Load Data" button
+  - "Load Data" calls `getCB` and `getBankRecords` in parallel via `Promise.all`
+  - Current CB indicator: large number with surplus/deficit label, green/red color
+  - KPI cards (3-column grid): `cbBefore`, `applied`, `cbAfter` — visible only after an apply action response
+  - Bank Surplus action card: amount input + "Bank Surplus" button
+    - Disabled when `currentCB <= 0` with explanatory text
+    - Calls `POST /banking/bank`, then refreshes bank records
+  - Apply Banked Surplus action card: amount input + "Apply Banked" button
+    - Disabled when no unapplied bank records exist
+    - Calls `POST /banking/apply`, updates KPI cards with `BankResult` response, refreshes records
+  - Bank Records table: columns ID, Amount (gCO₂eq), Applied (✅ / ⏳)
+    - Applied rows dimmed with `bg-gray-50 text-gray-400`
+  - All errors displayed inline as red text (`text-red-600`), not browser alerts
+  - `actionLoading` state tracks which action is in-flight, disables all buttons during any action
+- Updated `App.tsx`: imported `BankingTab`, replaced placeholder with `<BankingTab />`
+
+**Validation:**
+- `npx tsc --noEmit` — zero errors under strict mode
+- `npx vite build` — successful production build (413 KB JS + 17 KB CSS)
+- `npx eslint` on all 4 changed files — zero lint warnings or errors
+- `getBankRecords` method added to both port and adapter — maintains hexagonal contract consistency
+- "Bank Surplus" button correctly disabled when `currentCB <= 0` (not just `< 0` — zero CB has nothing to bank)
+- "Apply Banked" button correctly disabled when `bankRecords.some(r => !r.applied)` is false
+- KPI cards only render after `bankResult` is non-null (not on initial load)
+- `Promise.all` for initial data load — parallel requests for CB and bank records
+- After bank/apply actions, records are re-fetched to show updated applied status
+- Error state cleared before each action, preventing stale error messages
+- All form inputs use `htmlFor`/`id` pairing for accessibility

@@ -2,6 +2,7 @@ import type {
   Route,
   RouteComparison,
   ComplianceBalance,
+  BankEntry,
   BankResult,
   PoolMemberInput,
   PoolResult,
@@ -27,6 +28,7 @@ export interface IApiClient {
   getCB(shipId: string, year: number): Promise<ComplianceBalance>;
   getAdjustedCB(shipId: string, year: number): Promise<ComplianceBalance>;
   bankSurplus(shipId: string, year: number, amount: number): Promise<void>;
+  getBankRecords(shipId: string, year: number): Promise<BankEntry[]>;
   applyBanked(shipId: string, year: number, amount: number): Promise<BankResult>;
   createPool(year: number, members: PoolMemberInput[]): Promise<PoolResult>;
 }
