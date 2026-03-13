@@ -92,6 +92,47 @@
 - Hand-calculated surplus: (89.3368 − 88.0) × (4800 × 41000) = 263,082,240 ✓
 - Confirmed use-case imports only port interfaces and domain types (no Express, no pg)
 
+### Prompt 5 — BankSurplus & ApplyBanked Use-Cases with Unit Tests
+
+**Prompt:**
+> In /backend/src/core/application/, create two use-cases:
+> 1. BankSurplus.ts — Input: { shipId, year, amount }. Validate: current CB >= amount (fetch from IComplianceRepository), amount > 0. Save to IBankRepository. Throw descriptive errors if invalid.
+> 2. ApplyBanked.ts — Input: { shipId, year, amount }. Fetch available (unapplied) bank entries for shipId. Validate total available >= requested amount. Mark entries as applied (greedy: apply smallest first). Return { applied, remaining, cb_after }.
+> Write unit tests for both — including edge cases: applying more than available, zero amount, happy path.
+
+**Output:**
+- `BankSurplus.ts`: use-case with constructor-injected `IComplianceRepository` and `IBankRepository`
+  - Validates amount > 0 before any DB calls
+  - Fetches CB via `findCB`, checks existence, then checks `cbGco2eq >= amount`
+  - Saves entry with `applied: false` via `bankRepo.save`
+  - 3 distinct error paths: zero/negative amount, no CB record, insufficient surplus
+- `ApplyBanked.ts`: use-case with constructor-injected `IBankRepository` and `IComplianceRepository`
+  - Validates amount > 0, fetches CB, fetches available entries via `findAvailable`
+  - Greedy smallest-first: sorts entries ascending by `amountGco2eq`, marks consumed entries via `markApplied`
+  - Returns `{ applied, remaining, cbAfter }` where `remaining` = total banked - applied, `cbAfter` = CB + applied
+- `__tests__/BankSurplus.test.ts`: 6 tests
+  - Happy path: CB 1M, bank 500K → saved correctly
+  - Zero amount → throws before any repo call
+  - Negative amount → throws
+  - No CB record → throws, save never called
+  - CB < requested → throws with descriptive message
+  - Negative CB (deficit) → throws "insufficient surplus"
+- `__tests__/ApplyBanked.test.ts`: 7 tests
+  - Happy path: 3 entries (50K, 150K, 200K), apply 300K → smallest-first order verified
+  - Partial consumption: 2 entries, apply less than total
+  - Zero amount → throws
+  - Negative amount → throws
+  - No CB record → throws
+  - Over-apply: available 150K, request 200K → throws
+  - Empty entries: no banked entries at all → throws
+
+**Validation:**
+- `npx tsc --noEmit` — zero errors
+- `npx jest --verbose` — 16/16 tests passing across 3 suites (ComputeCB + BankSurplus + ApplyBanked)
+- Both use-cases import only port interfaces and domain types — zero framework deps
+- Verified guard-clause ordering: amount validation → CB lookup → business-rule check
+- Confirmed `markApplied` call order in ApplyBanked tests matches smallest-first sort
+
 ## Validation / Corrections
 
 | Step | What was checked | Result |
@@ -107,6 +148,11 @@
 | ComputeCB formula | Hand-verified deficit & surplus calculations against spec | Correct |
 | ComputeCB tests | 3/3 pass: deficit, surplus, not-found error | Correct |
 | Use-case isolation | ComputeCB imports only ports/domain — no framework deps | Correct |
+| BankSurplus guards | 3 error paths: zero amount, no CB, insufficient surplus | Correct |
+| ApplyBanked greedy | Smallest-first sort verified via `toHaveBeenNthCalledWith` | Correct |
+| BankSurplus tests | 6/6 pass: happy path + 5 edge cases | Correct |
+| ApplyBanked tests | 7/7 pass: happy path + partial + 5 edge cases | Correct |
+| All tests combined | 16/16 pass across 3 suites | Correct |
 
 ## Observations
 
@@ -118,6 +164,7 @@
 - Port interfaces generated with correct generics (`Omit<ComplianceBalance, 'id'>`) and filter types on first attempt
 - Use-case class with constructor injection, formula implementation, and return type generated in one pass — agent correctly mapped `route.routeId` to `shipId` without being told
 - Test file with `jest.Mocked<>` typed mocks, `toBeCloseTo` for floating-point, and `expect.closeTo` in `toHaveBeenCalledWith` — all idiomatic Jest patterns produced correctly first try
+- BankSurplus + ApplyBanked: two use-cases with 13 combined tests generated in a single pass — agent correctly inferred guard-clause ordering (input validation → existence check → business rule) and greedy smallest-first application strategy
 
 ### Where manual intervention was needed
 - Agent outputs were reviewed for correctness against the assignment spec
@@ -126,6 +173,8 @@
 - Confirmed `RouteComparison` is a computed type (not persisted) — agent correctly kept it separate from the DB-aligned `Route` entity
 - Verified CB formula constants match the assignment spec (TARGET = 89.3368, MJ_PER_TONNE = 41,000)
 - Hand-calculated both test expectations to confirm math correctness
+- Reviewed BankSurplus error messages for clarity — each message includes actual vs requested values for debugging
+- Verified ApplyBanked smallest-first sort via `toHaveBeenNthCalledWith` call-order assertions in tests
 
 ### How tools were combined
 - Claude Code handled the full flow: reading the assignment, scaffolding, code generation, git operations

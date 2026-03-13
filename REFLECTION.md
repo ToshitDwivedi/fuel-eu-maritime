@@ -14,6 +14,8 @@ Boilerplate generation — Express app wiring, pg pool setup, migration runners 
 
 **Use-case implementation with tests** demonstrated the agent's ability to work within an established architecture. Given the port interfaces and domain types from the previous step, the agent produced a `ComputeCB` use-case with correct constructor injection, accurate formula implementation, and an idiomatic Jest test suite — all passing on the first run. The test mocking patterns (`jest.Mocked<>`, `toBeCloseTo` for floating-point, `expect.closeTo` inside `toHaveBeenCalledWith`) were generated correctly without manual correction, which is notable since testing patterns are a common area where AI agents hallucinate non-existent APIs.
 
+**Multi-use-case generation** scaled well. When asked to produce `BankSurplus` and `ApplyBanked` simultaneously (with 13 combined test cases), the agent maintained consistency across both — identical mock-factory patterns, consistent guard-clause ordering (input validation → existence check → business rule), and correct inter-use-case semantics (BankSurplus saves `applied: false`, ApplyBanked calls `markApplied`). The greedy smallest-first strategy in `ApplyBanked` was accurately implemented and verified with `toHaveBeenNthCalledWith` call-order assertions.
+
 ## Where Manual Oversight Matters
 
 Domain-specific logic requires careful human review. The FuelEU Maritime compliance formulas (CB calculation, banking rules, pooling constraints) involve regulation-specific semantics that an AI agent may approximate but not guarantee. Every formula and business rule must be validated against the actual regulation text.
