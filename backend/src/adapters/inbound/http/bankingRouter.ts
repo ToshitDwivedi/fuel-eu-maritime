@@ -47,7 +47,10 @@ export function createBankingRouter(
       res.status(201).json(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      if (message.includes('not found')) {
+      if (
+        message.includes('not found') ||
+        message.includes('No compliance balance')
+      ) {
         res.status(404).json({ error: message });
       } else if (
         message.includes('must be positive') ||
@@ -79,7 +82,10 @@ export function createBankingRouter(
       res.json(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      if (message.includes('not found')) {
+      if (
+        message.includes('not found') ||
+        message.includes('No compliance balance')
+      ) {
         res.status(404).json({ error: message });
       } else if (
         message.includes('must be positive') ||

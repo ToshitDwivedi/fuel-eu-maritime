@@ -110,8 +110,12 @@ npm run dev
 
 ```bash
 cd backend
-npm run test
+npm run test                 # run all tests (unit + integration)
 ```
+
+**Test coverage:**
+- **24 unit tests** across 4 use-case suites (ComputeCB, BankSurplus, ApplyBanked, CreatePool)
+- **25 integration tests** using supertest with in-memory repository implementations — no database required
 
 ## Seed Data
 
