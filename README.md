@@ -22,17 +22,17 @@ Both frontend and backend follow a hexagonal architecture with strict dependency
 ```
 backend/src/
   core/
-    domain/           ← entities, value objects (no framework imports)
-    application/      ← use-cases only
+    domain/               ← pure-data TS interfaces (Route, ComplianceBalance, BankEntry, Pool, PoolMember)
+    application/          ← use-cases only
     ports/
-      inbound/        ← interfaces exposed by use-cases
-      outbound/       ← interfaces adapters must implement
+      inbound/            ← interfaces exposed by use-cases
+      outbound/           ← repository interfaces (IRouteRepository, IComplianceRepository, IBankRepository, IPoolRepository)
   adapters/
-    inbound/http/     ← Express route handlers
-    outbound/postgres/← DB repositories implementing outbound ports
+    inbound/http/         ← Express route handlers
+    outbound/postgres/    ← DB repositories implementing outbound ports
   infrastructure/
-    db/               ← migrations, pool config, seed
-    server/           ← Express app setup
+    db/                   ← migrations, pool config, seed
+    server/               ← Express app setup
 ```
 
 ### Frontend structure (planned)
