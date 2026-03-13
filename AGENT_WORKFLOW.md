@@ -67,6 +67,31 @@
 - Confirmed zero framework imports in all domain and port files (only `@core/domain` imports in ports)
 - Verified barrel exports re-export all types correctly
 
+### Prompt 4 — ComputeCB Use-Case & Unit Tests
+
+**Prompt:**
+> In /backend/src/core/application/ComputeCB.ts, create a use-case class:
+> Formula: TARGET_INTENSITY = 89.3368, energyInScope = fuelConsumption * 41000, CB = (TARGET - actual) * energyInScope.
+> Takes routeId, year. Fetches route via IRouteRepository, computes CB, saves via IComplianceRepository, returns { shipId, year, cbGco2eq, surplus }.
+> Constructor injection for both repos. Write unit test with surplus, deficit, and route-not-found scenarios.
+
+**Output:**
+- `ComputeCB.ts`: use-case class with constructor-injected `IRouteRepository` and `IComplianceRepository`
+- Constants extracted: `TARGET_INTENSITY = 89.3368`, `MJ_PER_TONNE = 41_000`
+- `ComputeCBResult` interface returned from `execute()` with `surplus: boolean` derived from `cbGco2eq >= 0`
+- Maps `route.routeId` → `shipId` when saving to compliance (business key, not UUID)
+- `__tests__/ComputeCB.test.ts`: 3 test cases with fully mocked repositories
+  - Deficit: HFO route at 91.0 gCO₂e/MJ → negative CB (-340,956,000 gCO₂eq)
+  - Surplus: LNG route at 88.0 gCO₂e/MJ → positive CB (263,082,240 gCO₂eq)
+  - Not-found: throws `"Route not found: <id>"`, verifies `saveCB` is never called
+
+**Validation:**
+- `npx tsc --noEmit` — zero errors
+- `npx jest --verbose` — 3/3 tests passing
+- Hand-calculated deficit: (89.3368 − 91.0) × (5000 × 41000) = −340,956,000 ✓
+- Hand-calculated surplus: (89.3368 − 88.0) × (4800 × 41000) = 263,082,240 ✓
+- Confirmed use-case imports only port interfaces and domain types (no Express, no pg)
+
 ## Validation / Corrections
 
 | Step | What was checked | Result |
@@ -79,6 +104,9 @@
 | Domain types | All fields match DB migration columns, `readonly` throughout | Correct |
 | Port interfaces | Only import from `@core/domain`, zero framework deps | Correct |
 | Type compilation | `tsc --noEmit` passes with strict mode, zero errors | Correct |
+| ComputeCB formula | Hand-verified deficit & surplus calculations against spec | Correct |
+| ComputeCB tests | 3/3 pass: deficit, surplus, not-found error | Correct |
+| Use-case isolation | ComputeCB imports only ports/domain — no framework deps | Correct |
 
 ## Observations
 
@@ -88,12 +116,16 @@
 - ESLint flat-config format (eslint.config.mjs) with typescript-eslint v8 — avoids common setup mistakes
 - Domain modeling from spec + migrations: agent read all 5 SQL migration files in parallel, then generated aligned TypeScript interfaces in a single pass — no manual cross-referencing needed
 - Port interfaces generated with correct generics (`Omit<ComplianceBalance, 'id'>`) and filter types on first attempt
+- Use-case class with constructor injection, formula implementation, and return type generated in one pass — agent correctly mapped `route.routeId` to `shipId` without being told
+- Test file with `jest.Mocked<>` typed mocks, `toBeCloseTo` for floating-point, and `expect.closeTo` in `toHaveBeenCalledWith` — all idiomatic Jest patterns produced correctly first try
 
 ### Where manual intervention was needed
 - Agent outputs were reviewed for correctness against the assignment spec
 - Documentation required domain-specific knowledge (FuelEU regulation references, formula accuracy)
 - Verified union type values (`VesselType`, `FuelType`) match the exact strings used in seed data
 - Confirmed `RouteComparison` is a computed type (not persisted) — agent correctly kept it separate from the DB-aligned `Route` entity
+- Verified CB formula constants match the assignment spec (TARGET = 89.3368, MJ_PER_TONNE = 41,000)
+- Hand-calculated both test expectations to confirm math correctness
 
 ### How tools were combined
 - Claude Code handled the full flow: reading the assignment, scaffolding, code generation, git operations

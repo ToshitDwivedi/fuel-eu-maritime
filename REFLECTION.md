@@ -12,6 +12,8 @@ Boilerplate generation — Express app wiring, pg pool setup, migration runners 
 
 **Domain modeling** was surprisingly effective. By feeding the agent both the assignment spec and the existing SQL migrations, it produced TypeScript interfaces that aligned 1:1 with the database schema while following TypeScript best practices (`readonly` properties, union types for enums, `Omit<>` for auto-generated fields). The agent also correctly identified `RouteComparison` as a computed type that doesn't map to a table — a distinction that requires understanding the difference between persisted entities and derived DTOs.
 
+**Use-case implementation with tests** demonstrated the agent's ability to work within an established architecture. Given the port interfaces and domain types from the previous step, the agent produced a `ComputeCB` use-case with correct constructor injection, accurate formula implementation, and an idiomatic Jest test suite — all passing on the first run. The test mocking patterns (`jest.Mocked<>`, `toBeCloseTo` for floating-point, `expect.closeTo` inside `toHaveBeenCalledWith`) were generated correctly without manual correction, which is notable since testing patterns are a common area where AI agents hallucinate non-existent APIs.
+
 ## Where Manual Oversight Matters
 
 Domain-specific logic requires careful human review. The FuelEU Maritime compliance formulas (CB calculation, banking rules, pooling constraints) involve regulation-specific semantics that an AI agent may approximate but not guarantee. Every formula and business rule must be validated against the actual regulation text.
@@ -21,7 +23,7 @@ Architecture decisions — how to slice domain boundaries, which entities belong
 ## What I Would Do Differently
 
 1. **Start with domain modeling first** — Define entities and ports before any infrastructure code; the agent is most useful when it has clear interfaces to implement against. This was validated in practice: having the SQL migrations already in place gave the agent concrete schemas to align against, producing accurate types on the first pass.
-2. **Write tests alongside domain logic** — Use the agent for test generation immediately after each use-case, not as an afterthought.
+2. **Write tests alongside domain logic** — Use the agent for test generation immediately after each use-case, not as an afterthought. This was validated with ComputeCB: generating the test in the same prompt as the use-case ensured tight alignment between implementation and test expectations, and caught potential formula errors immediately.
 3. **Smaller, more focused prompts** — Breaking large requests into targeted prompts (e.g., "implement the CB calculation use-case with these exact formulas") produces more accurate results than broad instructions.
 4. **Cross-reference multiple sources** — The agent performed best when given both the spec and existing code (migrations) to work from. Providing a single source leads to assumptions; providing two sources enables verification.
 
