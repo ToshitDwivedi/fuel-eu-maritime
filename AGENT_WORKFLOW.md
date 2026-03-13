@@ -292,6 +292,15 @@
 | BankingTab errors | Inline red text, not alerts; cleared before each action | Correct |
 | BankingTab type-check | `tsc --noEmit` zero errors, `vite build` 413KB JS + 17KB CSS | Correct |
 | BankingTab lint | `eslint` zero warnings on all 4 changed files | Correct |
+| PoolingTab form | Dynamic member rows with add/remove, stable keys, 2-row minimum | Correct |
+| PoolingTab validation | Uses `validatePool` from core/application, no duplicate logic | Correct |
+| PoolingTab sum indicator | Large green/red number with valid/invalid text | Correct |
+| PoolingTab cbAfter | Populated from PoolResult via Map lookup, cleared on edit | Correct |
+| PoolingTab disabled logic | Cascading: year → count → empty shipIds → sum validation | Correct |
+| PoolingTab success card | Shows Pool ID, totalCbBefore, totalCbAfter on creation | Correct |
+| PoolingTab integration | Wired into App.tsx, all 4 tabs now render real components | Correct |
+| PoolingTab type-check | `tsc --noEmit` zero errors, `vite build` 419KB JS + 18KB CSS | Correct |
+| PoolingTab lint | `eslint` zero warnings on PoolingTab.tsx and App.tsx | Correct |
 
 ## Observations
 
@@ -310,6 +319,7 @@
 - Tab navigation + RoutesTab: agent produced App.tsx with tab switching and a full data-fetching RoutesTab component in a single pass — dynamic filter options derived via `useMemo` + `Set`, proper `useCallback`/`useEffect` for data fetching, loading/error/empty UI states, and baseline highlight with badge — all type-checking on first try
 - CompareTab + Chart.js: agent produced a complete comparison tab with summary card, color-coded table, and interactive bar chart in a single pass — correctly identified need for `chartjs-plugin-annotation` (not bundled with chart.js) for the horizontal target reference line, used tree-shaken imports to minimize bundle size (~200KB added for Chart.js vs full ~300KB), and followed exact same component patterns as RoutesTab for consistency
 - BankingTab: agent identified a missing `getBankRecords` method in the frontend port/adapter before writing the component — proactively added it to maintain hexagonal contract completeness, then produced a multi-action component with 6 state variables, parallel data loading (`Promise.all`), conditional KPI cards, and two disabled-state-aware action buttons — all type-checking on first pass
+- PoolingTab: agent produced a dynamic form with inline-editable table rows, stable key management for React reconciliation, and integration with the existing `validatePool` pure function from core/application — correctly reused the domain validation layer instead of duplicating logic, and implemented cascading disabled-state help text that explains exactly why the button is disabled at each stage
 
 ### Where manual intervention was needed
 - Agent outputs were reviewed for correctness against the assignment spec
@@ -333,6 +343,10 @@
 - Verified `Promise.all` for initial load doesn't mask individual errors — if either CB or records fails, the catch handler still shows the first error message
 - Confirmed KPI cards only appear after apply action (not on initial load), preventing confusing empty state
 - Reviewed `actionLoading` guard: all action buttons disabled while any action is in-flight, preventing concurrent mutations
+- PoolingTab: verified `poolResult` is cleared when any member input changes — prevents stale cbAfter values from previous pool creation
+- Confirmed remove button disabled at exactly 2 members — enforces Article 21 minimum, prevents invalid empty-member state
+- Verified `parsedMembers` filters correctly: rows with empty shipId or empty cbBefore are excluded from validation and API call
+- Reviewed `cbAfterMap` lookup: uses `row.shipId.trim()` to match, consistent with how `parsedMembers` trims shipIds
 
 ### How tools were combined
 - Claude Code handled the full flow: reading the assignment, scaffolding, code generation, git operations
@@ -501,3 +515,47 @@
 - After bank/apply actions, records are re-fetched to show updated applied status
 - Error state cleared before each action, preventing stale error messages
 - All form inputs use `htmlFor`/`id` pairing for accessibility
+
+### Prompt 13 — Pooling Tab (Article 21) with Dynamic Members and Pool Validation
+
+**Prompt:**
+> Create /frontend/src/adapters/ui/PoolingTab.tsx:
+> State: year input, members array [{shipId, cbBefore}], poolResult
+> UI: 1. Year selector at top 2. "Add Member" button → appends row with shipId + cbBefore + remove button 3. Members table: shipId, CB Before, CB After (from result) 4. Pool Sum indicator: large green/red number, "Pool is valid ✓" / "Pool invalid — sum must be ≥ 0 ✗" 5. "Create Pool" button: disabled if sum < 0, any shipId empty, fewer than 2 members. On success: fill cbAfter from response.
+> Use in-memory validation from core/application (no API call) to compute the sum and enable/disable the button.
+
+**Output:**
+- `PoolingTab.tsx`: dynamic form-based component with managed member rows
+  - `MemberRow` local interface with `key` (stable identity), `shipId`, `cbBefore` (string for controlled input)
+  - Module-level `nextKey` counter for stable React keys across add/remove cycles
+  - `emptyRow()` factory — initializes 2 rows on mount (minimum required by Article 21)
+  - Year input at top + "Add Member" button in configuration card
+  - Members table with editable inline inputs:
+    - Ship ID: text input per row
+    - CB Before: number input per row
+    - CB After: populated from `poolResult` via `cbAfterMap` (Map lookup by shipId), shows "—" until submitted
+    - Remove button: disabled when only 2 members remain (enforces minimum)
+  - `parsedMembers` via `useMemo`: filters incomplete rows, converts `cbBefore` string to number
+  - `poolSum` via `useMemo`: reduces parsed members' `cbBefore` values
+  - `validation` via `useMemo`: calls `validatePool()` from `@core/application` — in-memory, no API call
+  - Pool Sum indicator: large number with green/red coloring, "Pool is valid ✓" / "Pool invalid — sum must be ≥ 0 ✗"
+  - "Create Pool" button disabled when: no year, `validation.valid` is false, any shipId empty with cbBefore filled, or submitting
+  - Contextual help text next to button explaining why it's disabled
+  - On success: `PoolResult` response populates `cbAfterMap`, fills CB After column, shows green success card with Pool ID and totals
+  - `poolResult` and `cbAfterMap` reset when any member input changes (prevents stale after-values)
+  - Error display: inline red text, same pattern as BankingTab
+- Updated `App.tsx`: imported `PoolingTab`, replaced last placeholder with `<PoolingTab />`
+  - All 4 tabs now render actual components — no more "coming soon" placeholders
+
+**Validation:**
+- `npx tsc --noEmit` — zero errors under strict mode
+- `npx vite build` — successful production build (419 KB JS + 18 KB CSS)
+- `npx eslint` on PoolingTab.tsx and App.tsx — zero lint warnings or errors
+- `validatePool` imported from `@core/application` — uses existing pure function, no duplicate logic
+- Remove button disabled at 2 members — cannot go below Article 21 minimum
+- `cbAfterMap` uses `Map<string, number>` for O(1) lookup by shipId
+- `poolResult` cleared on any member edit — prevents showing stale cbAfter values from a previous submission
+- Dynamic key-based identity (`nextKey++`) ensures correct React reconciliation when rows are added/removed
+- `parsedMembers` correctly filters out incomplete rows (empty shipId or empty cbBefore)
+- Disabled-button help text cascades: year → member count → empty shipIds → validation reason
+- All 4 frontend tabs now fully implemented — dashboard is feature-complete

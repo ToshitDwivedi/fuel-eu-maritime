@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { RoutesTab } from '@adapters/ui/RoutesTab';
 import { CompareTab } from '@adapters/ui/CompareTab';
 import { BankingTab } from '@adapters/ui/BankingTab';
+import { PoolingTab } from '@adapters/ui/PoolingTab';
 
 const TABS = ['Routes', 'Compare', 'Banking', 'Pooling'] as const;
 type Tab = (typeof TABS)[number];
@@ -39,9 +40,7 @@ export default function App() {
         {activeTab === 'Routes' && <RoutesTab />}
         {activeTab === 'Compare' && <CompareTab />}
         {activeTab === 'Banking' && <BankingTab />}
-        {activeTab === 'Pooling' && (
-          <p className="text-gray-500">Pooling tab coming soon.</p>
-        )}
+        {activeTab === 'Pooling' && <PoolingTab />}
       </main>
     </div>
   );
